@@ -347,7 +347,7 @@ def _GetDiffLines(filenames):
 
   regex = re.compile(
       r'\n@.+\+([0-9]+)(?:,([0-9]+))?(?:.+\n(?!-.*(?:\n@|$)))+?\+.*(?=\n@|$)')
-  diff = git.cmd.Git().execute(('git', 'diff', '-U0', *filenames))
+  diff = git.cmd.Git().execute(['git', 'diff', '-U0'] + filenames)
 
   lines = []
   for match in regex.finditer(diff):
