@@ -216,6 +216,8 @@ def main(argv):
 
   if args.additions:
     lines = _GetDiffLines(files)
+    if not lines:
+      lines = [(0, 0)]
 
   changed = FormatFiles(
       files,
