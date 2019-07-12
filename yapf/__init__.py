@@ -76,19 +76,25 @@ def main(argv):
       action='store_true',
       help='make changes to files in place')
 
-  lines_recursive_group = parser.add_mutually_exclusive_group()
-  lines_recursive_group.add_argument(
+  additions_lines_recursive_group = parser.add_mutually_exclusive_group()
+  additions_lines_recursive_group.add_argument(
       '-r',
       '--recursive',
       action='store_true',
       help='run recursively over directories')
-  lines_recursive_group.add_argument(
+  additions_lines_recursive_group.add_argument(
       '-l',
       '--lines',
       metavar='START-END',
       action='append',
       default=None,
       help='range of lines to reformat, one-based')
+  additions_lines_recursive_group.add_argument(
+      '-a',
+      '--additions',
+      action='store_true',
+      help=('only reformat lines which have been changed according to a Git '
+            'diff, excluding deletions'))
 
   parser.add_argument(
       '-e',
@@ -160,9 +166,9 @@ def main(argv):
   lines = _GetLines(args.lines) if args.lines is not None else None
   if not args.files:
     # No arguments specified. Read code from stdin.
-    if args.in_place or args.diff:
-      parser.error('cannot use --in-place or --diff flags when reading '
-                   'from stdin')
+    if args.in_place or args.diff or args.additions:
+      parser.error('cannot use --in-place, --diff, or --additions flags '
+                   'when reading from stdin')
 
     original_source = []
     while True:
@@ -207,6 +213,9 @@ def main(argv):
                                              exclude_patterns_from_ignore_file)
   if not files:
     raise errors.YapfError('Input filenames did not match any python files')
+
+  if args.additions:
+    lines = _GetDiffLines(files)
 
   changed = FormatFiles(
       files,
@@ -327,6 +336,24 @@ def _GetLines(line_strings):
     if line[0] > line[1]:
       raise errors.YapfError('end comes before start in line range: %r', line)
     lines.append(tuple(line))
+  return lines
+
+
+def _GetDiffLines(filenames):
+  import re
+  import git
+
+  regex = re.compile(
+      r'\n@.+\+([0-9]+)(?:,([0-9]+))?(?:.+\n(?!-.*(?:\n@|$)))+?\+.*(?=\n@|$)')
+  diff = git.cmd.Git().execute(('git', 'diff', '-U0', *filenames))
+
+  lines = []
+  for match in regex.finditer(diff):
+    group = tuple(map(int, match.groups('0')))
+    group = (group[0], group[0]) if group[1] == 0 else (group[0],
+                                                        group[0] + group[1] - 1)
+    lines.append(group)
+
   return lines
 
 
