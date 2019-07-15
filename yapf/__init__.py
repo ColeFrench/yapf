@@ -92,9 +92,13 @@ def main(argv):
   additions_lines_recursive_group.add_argument(
       '-a',
       '--additions',
-      action='store_true',
-      help=('only reformat lines which have been changed according to a Git '
-            'diff, excluding deletions'))
+      action='append',
+      nargs='?',
+      help=('only reformat added lines according to a Git diff. An option for '
+            'the diff command may be specified with each occurrence of -a '
+            '(e.g., "%(prog)s -a=--cached -a origin/master ...").'),
+      metavar='DIFF_OPT',
+      dest='diff_opts')
 
   parser.add_argument(
       '-e',
@@ -166,7 +170,7 @@ def main(argv):
   lines = _GetLines(args.lines) if args.lines is not None else None
   if not args.files:
     # No arguments specified. Read code from stdin.
-    if args.in_place or args.diff or args.additions:
+    if args.in_place or args.diff or args.diff_opts:
       parser.error('cannot use --in-place, --diff, or --additions flags '
                    'when reading from stdin')
 
@@ -214,8 +218,10 @@ def main(argv):
   if not files:
     raise errors.YapfError('Input filenames did not match any python files')
 
-  if args.additions:
-    lines = _GetDiffLines(files)
+  if args.diff_opts:
+    lines = _GetDiffLines(
+        [diff_opt for diff_opt in args.diff_opts if diff_opt is not None],
+        files)
     if not lines:
       lines = [(0, 0)]
 
@@ -341,13 +347,14 @@ def _GetLines(line_strings):
   return lines
 
 
-def _GetDiffLines(filenames):
+def _GetDiffLines(diff_opts, filenames):
   import re
   import git
 
   regex = re.compile(
       r'\n@.+\+([0-9]+)(?:,([0-9]+))?(?:.+\n(?!-.*(?:\n@|$)))+?\+.*(?=\n@|$)')
-  diff = git.cmd.Git().execute(['git', 'diff', '-U0'] + filenames)
+  diff = git.cmd.Git().execute(['git', 'diff', '-U0'] + diff_opts + ['--'] +
+                               filenames)
 
   lines = []
   for match in regex.finditer(diff):
