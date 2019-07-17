@@ -348,8 +348,12 @@ def _GetLines(line_strings):
 
 
 def _GetDiffLines(diff_opts, filenames):
+  try:
+    import git
+  except ImportError:
+    raise errors.YapfError('--additions requires GitPython package')
+
   import re
-  import git
 
   regex = re.compile(
       r'\n@.+\+([0-9]+)(?:,([0-9]+))?(?:.+\n(?!-.*(?:\n@|$)))+?\+.*(?=\n@|$)')
